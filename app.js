@@ -24,120 +24,24 @@ router.get('/', function (req, res) {
     res.json({message: 'hooray! welcome to our api!'});
 });
 
+const brainModule = require("./brain.js");
+
 // Orientations
 var ORIENTATIONS = ["N", "E", "S", "O"];
 
 router.route('/execute').post(function (request, response) {
 
-    // Information de la pelouse
-    var lawn = {
-        height: request.body.lawn.height,
-        width: request.body.lawn.width
-    };
-
-    // Position initiale (par défaut 0,0,N)
-    var currentPosition = {
-        x: 0,
-        y: 0,
-        orientation: "N"
-    };
-
+    // Création du brain
+    const brain = brainModule(request.body.lawn, request.body.initialPosition);
 
     // Iteration sur les actions
-    for (i = 0; i < request.body.actions.length; i++) {
-
-        // Variable que contient la nouvelle position suite au mouvement
-        var newPosition = {};
-
-        var action = request.body.actions[i];
-        switch (action) {
-            case "A":
-                newPosition = goForward(currentPosition);
-                break;
-            case "G":
-                newPosition = turnLeft(currentPosition);
-                break;
-            case "D":
-                newPosition = turnRight(currentPosition);
-                break;
-            default:
-                // Exception
-                console.error("Action non reconue");
-        }
-
-        // Validation de la nouvelle position
-        if (!isOutOfBoundaries(lawn, newPosition)) {
-            // Position valide. On fait le mouvement
-            currentPosition = newPosition;
-        }
-        else {
-            console.log("Out of boundaries");
-        }
+    for (i=0; i<request.body.actions.length; i++) {
+        brain.execute(request.body.actions[i]);
     }
 
-    response.json(currentPosition);
+    response.json(brain.getCurrentPosition());
 });
 
-function isOutOfBoundaries(lawn, newPosition) {
-
-    return newPosition.x < 0 || newPosition.x >= lawn.width || newPosition.y < 0 || newPosition.y >= lawn.height;
-}
-
-function clonePosition(position) {
-
-    return {
-        x: position.x,
-        y: position.y,
-        orientation: position.orientation
-    };
-}
-
-function goForward(currentPosition) {
-
-    // On verifie l'action à faire selon l'orientation actuelle
-    var newPosition = clonePosition(currentPosition);
-
-    switch (currentPosition.orientation) {
-        case "N":
-            newPosition.y++;
-            break;
-        case "S":
-            newPosition.y--;
-            break;
-        case "E":
-            newPosition.x++;
-            break;
-        case "O":
-            newPosition.x--;
-    }
-    ;
-
-    return newPosition;
-};
-
-function turnLeft(currentPosition) {
-
-    var newPosition = clonePosition(currentPosition);
-
-    var currentIndex = ORIENTATIONS.indexOf(currentPosition.orientation);
-    var index = (currentIndex == 0) ? ORIENTATIONS.length -1 : currentIndex - 1;
-
-    newPosition.orientation = ORIENTATIONS[index];
-
-    return newPosition;
-}
-
-function turnRight(currentPosition) {
-
-    var newPosition = clonePosition(currentPosition);
-
-    var currentIndex = ORIENTATIONS.indexOf(currentPosition.orientation);
-    var index = ++currentIndex % ORIENTATIONS.length;
-
-    newPosition.orientation = ORIENTATIONS[index];
-
-    return newPosition;
-}
 
 
 // more routes for our API will happen here
