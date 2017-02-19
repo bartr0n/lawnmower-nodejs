@@ -6,51 +6,30 @@
 // call the packages we need
 var express = require('express');        // call express
 var app = express();                 // define our app using express
-var bodyParser = require('body-parser');
-
-// configure app to use bodyParser()
-// this will let us get the data from a POST
-app.use(bodyParser.urlencoded({extended: true}));
-app.use(bodyParser.json());
-
-var port = process.env.PORT || 8080;        // set our port
-
-// ROUTES FOR OUR API
-// =============================================================================
-var router = express.Router();              // get an instance of the express Router
-
-// test route to make sure everything is working (accessed at GET http://localhost:8080/api)
-router.get('/', function (req, res) {
-    res.json({message: 'hooray! welcome to our api!'});
-});
 
 const brainModule = require("./brain.js");
 
-// Orientations
-var ORIENTATIONS = ["N", "E", "S", "O"];
+// Module de gestion rabbitMQ
+var amqp = require('amqplib/callback_api');
+amqp.connect('amqp://localhost', function (error, connection) {
+    connection.createChannel(function (error, channel) {
+        var queueName = "lawnmower-request-queue"
 
-router.route('/execute').post(function (request, response) {
+        channel.assertQueue(queueName, {durable: false});
 
-    // Création du brain
-    const brain = brainModule(request.body.lawn, request.body.initialPosition);
+        console.log("Waiting for petitions...");
 
-    // Iteration sur les actions
-    for (i=0; i<request.body.actions.length; i++) {
-        brain.execute(request.body.actions[i]);
-    }
+        channel.consume(queueName, function (message) {
+            // Code gerant la tendeuse
+            console.log("Message received: lawn=" + message.content.lawn + ", initialPosition=" + message.content.initialPosition);
 
-    response.json(brain.getCurrentPosition());
+            const brain = brainModule(message.content.lawn, message.content.initialPosition);
+            for (i = 0; i < message.content.actions.length; i++) {
+                brain.execute(message.content.actions[i]);
+            }
+
+            // Envoi de la réponse au client??
+
+        });
+    });
 });
-
-
-
-// more routes for our API will happen here
-
-// REGISTER OUR ROUTES -------------------------------
-// all of our routes will be prefixed with /api
-app.use('/api', router);
-
-// START THE SERVER
-// =============================================================================
-app.listen(port);
-console.log('Magic happens on port ' + port);
