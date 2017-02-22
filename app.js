@@ -1,35 +1,42 @@
-// server.js
+var events = require('events');
 
-// BASE SETUP
-// =============================================================================
+const eventEmitter = new events.EventEmitter();
 
-// call the packages we need
-var express = require('express');        // call express
-var app = express();                 // define our app using express
-
+// Instantiation du module brain de la tendeuse
 const brainModule = require("./brain.js");
 
 // Module de gestion rabbitMQ
 var amqp = require('amqplib/callback_api');
 amqp.connect('amqp://localhost', function (error, connection) {
     connection.createChannel(function (error, channel) {
-        var queueName = "lawnmower-request-queue"
 
-        channel.assertQueue(queueName, {durable: false});
+        var exchange = "lawnmower.exchange";
 
-        console.log("Waiting for petitions...");
+        channel.assertExchange(exchange, 'direct', {durable: false});
+        channel.assertQueue('', {exclusive: true}, function (error, q) {
+            console.log("Waiting for petitions...");
 
-        channel.consume(queueName, function (message) {
-            // Code gerant la tendeuse
-            console.log("Message received: lawn=" + message.content.lawn + ", initialPosition=" + message.content.initialPosition);
+            channel.bindQueue(q.queue, exchange, '');
 
-            const brain = brainModule(message.content.lawn, message.content.initialPosition);
-            for (i = 0; i < message.content.actions.length; i++) {
-                brain.execute(message.content.actions[i]);
-            }
+            channel.consume(q.queue, function(message) {
 
-            // Envoi de la réponse au client??
+                // Récupération du payload et initialisation de la tendeuse
+                var payload = JSON.parse(message.content);
+                const brain = brainModule(payload.lawn, payload.initialPosition);
 
+                for (i=0; i<payload.actions.length; i++) {
+                    brain.execute(payload.actions[i]);
+                };
+
+                eventEmitter.emit('complete', brain.getCurrentPosition());
+            });
         });
     });
+});
+
+// Callback de l'evenement
+eventEmitter.on('complete', function(finalPosition) {
+    console.log("Final position: [x=" + finalPosition.x + ", y=" + finalPosition.y + ", orientation=" + finalPosition.orientation + "]");
+
+    // TODO: publish sur un queue
 });

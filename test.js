@@ -18,7 +18,9 @@ var amqp = require('amqplib/callback_api');
 amqp.connect('amqp://localhost', function (error, connection) {
 
     connection.createChannel(function (error, channel) {
-        var channelName = 'lawnmower-request-queue';
+        var exchange = "lawnmower.exchange";
+
+        channel.assertExchange(exchange, 'direct', {durable: false});
 
         var payload = {
             "actions": "AAAAGD",
@@ -33,7 +35,6 @@ amqp.connect('amqp://localhost', function (error, connection) {
             }
         };
 
-        channel.assertQueue(channelName, {durable: false});
-        channel.sendToQueue(channelName, new Buffer(JSON.stringify(payload)));
+        channel.publish(exchange, '', new Buffer(JSON.stringify(payload)));
     });
 });
