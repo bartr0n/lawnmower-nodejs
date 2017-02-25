@@ -31,12 +31,19 @@ amqp.connect('amqp://localhost', function (error, connection) {
                 eventEmitter.emit('complete', brain.getCurrentPosition());
             });
         });
+
+
+        // Callback de l'evenement
+        eventEmitter.on('complete', function(finalPosition) {
+            console.log("Final position: [x=" + finalPosition.x + ", y=" + finalPosition.y + ", orientation=" + finalPosition.orientation + "]");
+
+            // TODO: publish sur un queue
+            var logExchange = "lawnmower.log";
+            channel.assertExchange(logExchange, 'direct', {durable: false});
+            channel.publish(logExchange, '', new Buffer(JSON.stringify(finalPosition)));
+
+            console.log("Message send to queue " + logExchange);
+        });
     });
 });
 
-// Callback de l'evenement
-eventEmitter.on('complete', function(finalPosition) {
-    console.log("Final position: [x=" + finalPosition.x + ", y=" + finalPosition.y + ", orientation=" + finalPosition.orientation + "]");
-
-    // TODO: publish sur un queue
-});
