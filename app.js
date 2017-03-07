@@ -18,31 +18,29 @@ amqp.connect('amqp://localhost', function (error, connection) {
 
             channel.bindQueue(q.queue, exchange, '');
 
-            channel.consume(q.queue, function(message) {
+            channel.consume(q.queue, function (message) {
 
                 // Récupération du payload et initialisation de la tendeuse
                 var payload = JSON.parse(message.content);
                 const brain = brainModule(payload.lawn, payload.initialPosition);
 
-                for (i=0; i<payload.actions.length; i++) {
+                for (i = 0; i < payload.actions.length; i++) {
                     brain.execute(payload.actions[i]);
-                };
+                }
+                ;
 
-                eventEmitter.emit('complete', brain.getCurrentPosition());
+                eventEmitter.emit('complete', brain.getCurrentPosition(), message);
             });
         });
 
 
         // Callback de l'evenement
-        eventEmitter.on('complete', function(finalPosition) {
+        eventEmitter.on('complete', function (finalPosition, intialMessage) {
             console.log("Final position: [x=" + finalPosition.x + ", y=" + finalPosition.y + ", orientation=" + finalPosition.orientation + "]");
 
-            // TODO: publish sur un queue
-            var logExchange = "lawnmower.log";
-            channel.assertExchange(logExchange, 'direct', {durable: false});
-            channel.publish(logExchange, '', new Buffer(JSON.stringify(finalPosition)));
-
-            console.log("Message send to queue " + logExchange);
+            // On répond au client utilisant la callbackQueue passée
+            channel.sendToQueue(initialMessage.properties.replyTo, new Buffer(JSON.stringify(finalPosition)), {correlationId: initialMessage.properties.correlationId});
+            channel.ack(message);
         });
     });
 });
